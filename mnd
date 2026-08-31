@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Real World Physics Predictor</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Inter, Arial, sans-serif; background: #07111f; color: #eaf2ff; }
+        header { padding: 28px 7%; border-bottom: 1px solid #1b3049; background: #081522; }
+        header h1 { margin: 0; font-size: 30px; }
+        header p { margin: 8px 0 0; color: #91a5bd; }
+        .container { width: min(1400px, 94%); margin: 30px auto; }
+        .input-card { background: #0d1b2b; border: 1px solid #20364e; border-radius: 18px; padding: 25px; margin-bottom: 25px; }
+        textarea { width: 100%; min-height: 120px; resize: vertical; background: #07111f; color: white; border: 1px solid #2b4560; border-radius: 12px; padding: 16px; font-size: 16px; outline: none; }
+        textarea:focus { border-color: #4da3ff; }
+        .examples { display: flex; gap: 10px; flex-wrap: wrap; margin: 15px 0; }
+        .example { background: #12263b; border: 1px solid #27445f; color: #b8d9f8; padding: 9px 13px; border-radius: 20px; cursor: pointer; }
+        .example:hover { background: #193550; }
+        button { background: linear-gradient(135deg, #2684ff, #725cff); border: none; color: white; padding: 13px 22px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+        button:hover { opacity: .9; }
+        .grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
+        .card { background: #0d1b2b; border: 1px solid #20364e; border-radius: 18px; padding: 20px; }
+        .card h2 { margin-top: 0; font-size: 19px; }
+        canvas { width: 100% !important; height: 420px !important; }
+        #simulation { width: 100%; height: 420px; background: linear-gradient(#081725, #0a1b2b); border-radius: 12px; position: relative; overflow: hidden; }
+        .ground { position: absolute; bottom: 0; left: 0; width: 100%; height: 35px; background: #152f26; border-top: 2px solid #285c45; }
+        #ball { width: 22px; height: 22px; background: #ff5c5c; border-radius: 50%; position: absolute; box-shadow: 0 0 20px rgba(255, 92, 92, .7); }
+        .metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .metric { background: #101f31; padding: 15px; border-radius: 12px; border: 1px solid #1e354c; }
+        .metric-label { color: #8197ae; font-size: 13px; }
+        .metric-value { margin-top: 5px; font-size: 22px; font-weight: bold; color: #fff; }
+        .model { background: #07111f; border: 1px solid #20364e; border-radius: 10px; padding: 15px; margin-top: 15px; color: #9fc7ee; font-family: monospace; white-space: pre-wrap; }
+        .status { color: #69d391; margin-top: 10px; }
+        @media(max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>🚀 AI Real World Physics Predictor</h1>
+    <p>Describe a real-world situation and turn it into a physics simulation.</p>
+</header>
+
+<div class="container">
+    <div class="input-card">
+        <h2>Describe your experiment</h2>
+        <textarea id="prompt" placeholder="Example: A 0.45 kg football is kicked at 20 m/s at 35 degrees with 0.02 drag..."></textarea>
+        <div class="examples">
+            <div class="example" onclick="useExample(1)">⚽ Football kicked at 20 m/s at 35°</div>
+            <div class="example" onclick="useExample(2)">🏢 Ball thrown from a 10m building</div>
+            <div class="example" onclick="useExample(3)">🌬️ 0.15kg baseball thrown at 40m/s at 45° with 0.01 drag</div>
+        </div>
+        <button onclick="analyzePhysics()">🧠 Analyze & Simulate</button>
+        <div id="status" class="status"></div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h2>🎥 Physics Simulation</h2>
+            <div id="simulation">
+                <div id="ball"></div>
+                <div class="ground"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📊 Prediction</h2>
+            <div class="metrics">
+                <div class="metric"><div class="metric-label">Initial Velocity</div><div class="metric-value" id="velocity">--</div></div>
+                <div class="metric"><div class="metric-label">Launch Angle</div><div class="metric-value" id="angle">--</div></div>
+                <div class="metric"><div class="metric-label">Mass</div><div class="metric-value" id="mass">--</div></div>
+                <div class="metric"><div class="metric-label">Air Drag</div><div class="metric-value" id="drag">--</div></div>
+                <div class="metric"><div class="metric-label">Maximum Height</div><div class="metric-value" id="maxHeight">--</div></div>
+                <div class="metric"><div class="metric-label">Range</div><div class="metric-value" id="range">--</div></div>
+                <div class="metric"><div class="metric-label">Time of Flight</div><div class="metric-value" id="time">--</div></div>
+                <div class="metric"><div class="metric-label">Gravity</div><div class="metric-value" id="gravity">--</div></div>
+            </div>
+
+            <h3>Generated Physics Model</h3>
+            <div class="model" id="model">Waiting for input...</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+        <h2>📈 Projectile Position</h2>
+        <canvas id="trajectoryChart"></canvas>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+        <h2>⚡ Velocity vs Time</h2>
+        <canvas id="velocityChart"></canvas>
+    </div>
+</div>
+
+<script>
+let trajectoryChart = null;
+let velocityChart = null;
+
+let physics = {
+    velocity: 20,
+    angle: 35,
+    height: 0,
+    gravity: 9.81,
+    mass: 1.0,
+    drag: 0.0
+};
+
+function useExample(number) {
+    const prompt = document.getElementById("prompt");
+    if (number === 1) prompt.value = "A football is kicked at 20 meters per second at 35 degrees.";
+    if (number === 2) prompt.value = "A ball is thrown horizontally from a 10 meter high building at 8 meters per second.";
+    if (number === 3) prompt.value = "A 0.15 kg baseball is thrown at 40 meters per second at 45 degrees with 0.01 air drag.";
+}
+
+function parsePhysics(text) {
+    text = text.toLowerCase();
+    
+    let velocity = 20, angle = 45, height = 0, gravity = 9.81, mass = 1.0, drag = 0.0;
+
+    let velocityMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:m\/s|meters?\s*(?:per|a)\s*second)/);
+    if (velocityMatch) velocity = parseFloat(velocityMatch[1]);
+
+    let angleMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:degree|degrees|°)/);
+    if (angleMatch) angle = parseFloat(angleMatch[1]);
+
+    let heightMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:m|meters?)\s*(?:high|height)/);
+    if (heightMatch) height = parseFloat(heightMatch[1]);
+
+    let massMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilograms?|kilos?)/);
+    if (massMatch) mass = parseFloat(massMatch[1]);
+
+    let dragMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:air drag|drag|resistance)/);
+    if (dragMatch) drag = parseFloat(dragMatch[1]);
+
+    if (text.includes("moon")) gravity = 1.62;
+    if (text.includes("mars")) gravity = 3.71;
+    if (text.includes("horizontally") || text.includes("horizontal")) angle = 0;
+
+    return { velocity, angle, height, gravity, mass, drag };
+}
+
+// Numerical Integration replaces the analytic equations
+function calculatePhysics(p) {
+    const theta = p.angle * Math.PI / 180;
+    const dt = 0.01; 
+    
+    let vx = p.velocity * Math.cos(theta);
+    let vy = p.velocity * Math.sin(theta);
+    let x = 0;
+    let y = p.height;
+    let t = 0;
+
+    const k = p.drag;
+    const m = p.mass || 1; 
+    const g = p.gravity;
+
+    let maxHeight = y;
+    const points = [];
+    const velocityPoints = [];
+
+    while (y >= 0 && t < 100) { // Limit to 100s to avoid infinite loops
+        points.push({ x: x, y: y });
+        velocityPoints.push({ x: t, y: Math.sqrt(vx * vx + vy * vy) });
+
+        let v = Math.sqrt(vx * vx + vy * vy);
+        
+        // F = ma -> a = F/m. Air drag F = -k * v^2
+        let ax = -(k / m) * v * vx; 
+        let ay = -g - (k / m) * v * vy;
+
+        vx += ax * dt;
+        vy += ay * dt;
+        x += vx * dt;
+        y += vy * dt;
+        t += dt;
+
+        if (y > maxHeight) maxHeight = y;
+    }
+
+    return {
+        initialVx: p.velocity * Math.cos(theta),
+        initialVy: p.velocity * Math.sin(theta),
+        timeOfFlight: t,
+        maxHeight: maxHeight,
+        range: x,
+        points: points,
+        velocityPoints: velocityPoints
+    };
+}
+
+function drawCharts(data) {
+    const ctx1 = document.getElementById("trajectoryChart");
+    const ctx2 = document.getElementById("velocityChart");
+
+    if (trajectoryChart) trajectoryChart.destroy();
+    if (velocityChart) velocityChart.destroy();
+
+    trajectoryChart = new Chart(ctx1, {
+        type: "line",
+        data: {
+            datasets: [{
+                label: "Projectile Path",
+                data: data.points,
+                borderColor: "#4da3ff",
+                backgroundColor: "rgba(77,163,255,.15)",
+                borderWidth: 3, pointRadius: 0, fill: true, tension: 0.2
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { type: "linear", title: { display: true, text: "Distance (m)", color: "#9fb1c6" }, ticks: { color: "#8ea2b8" } },
+                y: { title: { display: true, text: "Height (m)", color: "#9fb1c6" }, ticks: { color: "#8ea2b8" } }
+            },
+            plugins: { legend: { labels: { color: "#fff" } } }
+        }
+    });
+
+    velocityChart = new Chart(ctx2, {
+        type: "line",
+        data: {
+            datasets: [{
+                label: "Velocity",
+                data: data.velocityPoints,
+                borderColor: "#ff6464",
+                borderWidth: 3, pointRadius: 0, tension: .2
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { type: "linear", title: { display: true, text: "Time (seconds)", color: "#9fb1c6" }, ticks: { color: "#8ea2b8" } },
+                y: { title: { display: true, text: "Velocity (m/s)", color: "#9fb1c6" }, ticks: { color: "#8ea2b8" } }
+            },
+            plugins: { legend: { labels: { color: "#fff" } } }
+        }
+    });
+}
+
+function animateBall(p, result) {
+    const ball = document.getElementById("ball");
+    const simulation = document.getElementById("simulation");
+    const groundHeight = 35;
+    const horizontalScale = (simulation.clientWidth - 50) / Math.max(result.range, 1);
+    const verticalScale = (simulation.clientHeight - groundHeight - 40) / Math.max(result.maxHeight, 1);
+    const startTime = performance.now();
+
+    function frame(now) {
+        const elapsed = (now - startTime) / 1000;
+        const t = elapsed * 0.7; 
+
+        if (t > result.timeOfFlight) {
+            ball.style.left = (result.range * horizontalScale) + "px";
+            ball.style.bottom = groundHeight + "px";
+            return;
+        }
+
+        // Fetch position dynamically from simulation array
+        let index = Math.floor(t / 0.01);
+        if (index >= result.points.length) index = result.points.length - 1;
+
+        const screenX = result.points[index].x * horizontalScale;
+        const screenY = result.points[index].y * verticalScale;
+
+        ball.style.left = screenX + "px";
+        ball.style.bottom = (groundHeight + screenY) + "px";
+
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+}
+
+function analyzePhysics() {
+    const text = document.getElementById("prompt").value;
+    if (!text.trim()) { alert("Describe a physics situation first."); return; }
+
+    document.getElementById("status").innerText = "🧠 Understanding situation...";
+
+    setTimeout(() => {
+        physics = parsePhysics(text);
+        const result = calculatePhysics(physics);
+
+        document.getElementById("velocity").innerText = physics.velocity.toFixed(2) + " m/s";
+        document.getElementById("angle").innerText = physics.angle.toFixed(2) + "°";
+        document.getElementById("mass").innerText = physics.mass.toFixed(2) + " kg";
+        document.getElementById("drag").innerText = physics.drag.toFixed(3);
+        document.getElementById("maxHeight").innerText = result.maxHeight.toFixed(2) + " m";
+        document.getElementById("range").innerText = result.range.toFixed(2) + " m";
+        document.getElementById("time").innerText = result.timeOfFlight.toFixed(2) + " s";
+        document.getElementById("gravity").innerText = physics.gravity.toFixed(2) + " m/s²";
+
+        document.getElementById("model").innerText =
+`MODEL: Projectile Motion (with drag)
+
+Initial velocity: ${physics.velocity.toFixed(2)} m/s
+Launch angle: ${physics.angle.toFixed(2)}°
+Initial height: ${physics.height.toFixed(2)} m
+Mass: ${physics.mass.toFixed(2)} kg
+Air Drag Coefficient: ${physics.drag.toFixed(3)}
+Gravity: ${physics.gravity.toFixed(2)} m/s²
+
+Maximum height: ${result.maxHeight.toFixed(2)} m
+Range: ${result.range.toFixed(2)} m
+Time of flight: ${result.timeOfFlight.toFixed(2)} s`;
+
+        drawCharts(result);
+        animateBall(physics, result);
+
+        document.getElementById("status").innerText = "✅ Physics model generated successfully.";
+    }, 500);
+}
+</script>
+</body>
+</html>
